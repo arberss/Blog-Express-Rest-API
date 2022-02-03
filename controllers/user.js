@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 
 const User = require('../models/user');
-const Post = require('../models/post');
+const { Post, Notification } = require('../models/post');
 
 require('dotenv').config();
 
@@ -22,7 +22,7 @@ exports.createUser = async (req, res, next) => {
   }
   if (
     validator.isEmpty(password) ||
-    !validator.isLength(password, { min: 5 })
+    !validator.isLength(password, { min: 6 })
   ) {
     errors.push({ message: 'Password too short!' });
   }
@@ -57,7 +57,14 @@ exports.createUser = async (req, res, next) => {
     });
 
     const createdUser = await user.save();
-    return res.status(200).json(createdUser);
+    const returnData = {
+      email: createdUser.email,
+      name: createdUser.name,
+      imageUrl: createdUser.imageUrl,
+      role: createdUser.role,
+    };
+
+    return res.status(200).json(returnData);
   } catch (err) {
     if (!err.statusCode) {
       err.statusCode = 500;
@@ -79,7 +86,7 @@ exports.login = async (req, res, next) => {
     const isEqual = await bcrypt.compare(password, user.password);
     if (!isEqual) {
       const error = new Error('Password is incorrect.');
-      error.code = 401;
+      error.statusCode = 401;
       throw error;
     }
     const token = jwt.sign(
@@ -89,7 +96,7 @@ exports.login = async (req, res, next) => {
         role: user.role,
       },
       `${process.env.LOGIN_TOKEN}`,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' }
     );
 
     return res.status(200).json({ token, userId: user._id });
@@ -104,11 +111,13 @@ exports.login = async (req, res, next) => {
 exports.currentUser = async (req, res, next) => {
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const user = await User.findById(req.user.userId).select(
+      '-password -posts'
+    );
     if (!user) {
       const error = new Error('This user does not exist');
       error.status = 404;
@@ -126,7 +135,7 @@ exports.currentUser = async (req, res, next) => {
 exports.updateUser = async (req, res, next) => {
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
 
@@ -139,10 +148,7 @@ exports.updateUser = async (req, res, next) => {
   if (validator.isEmpty(name)) {
     errors.push({ message: 'Name can not be empty!' });
   }
-  if (
-    validator.isEmpty(password) ||
-    !validator.isLength(password, { min: 5 })
-  ) {
+  if (password !== '' && !validator.isLength(password, { min: 6 })) {
     errors.push({ message: 'Password too short!' });
   }
   if (errors.length > 0) {
@@ -170,10 +176,11 @@ exports.updateUser = async (req, res, next) => {
       clearImage(user.imageUrl);
     }
 
-    user.email = email;
-    user.name = name;
-    user.imageUrl = imageUrl;
-    user.password = hashedPw;
+    user.email = email || user.email;
+    user.name = name || user.name;
+    user.imageUrl =
+      imageUrl !== null || imageUrl.trim() !== '' ? imageUrl : user?.imageUrl;
+    user.password = password.trim() !== '' ? hashedPw : user.password;
 
     if (!imageUrl || !req.file) {
       delete user.imageUrl;
@@ -181,7 +188,15 @@ exports.updateUser = async (req, res, next) => {
 
     const savedUser = await user.save();
 
-    return res.status(201).json(savedUser);
+    const jsonData = {
+      _id: savedUser._id,
+      name: savedUser.name,
+      email: savedUser.email,
+      imageUrl: savedUser.imageUrl,
+      role: savedUser.role,
+    };
+
+    return res.status(201).json(jsonData);
   } catch (err) {
     if (!err.statusCode) {
       err.statusCode = 500;
@@ -193,7 +208,7 @@ exports.updateUser = async (req, res, next) => {
 exports.allUsers = async (req, res, next) => {
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
   try {
@@ -218,7 +233,7 @@ exports.adminUpdateRoles = async (req, res, next) => {
 
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
   try {
@@ -247,7 +262,7 @@ exports.updateUserRole = async (req, res, next) => {
 
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
 
@@ -286,7 +301,7 @@ exports.forgotPassword = async (req, res, next) => {
         userId: user._id.toString(),
         email: user.email,
       },
-     `${process.env.FORGOT_EMAIL_SECRET}`,
+      `${process.env.FORGOT_EMAIL_SECRET}`,
       { expiresIn: 60 * 15 }
     );
 
@@ -303,7 +318,7 @@ exports.forgotPassword = async (req, res, next) => {
       secure: false, // true for 465, false for other ports
       auth: {
         user: `${process.env.SEND_MAIL_USER}`,
-        pass: `${process.env.SEND_MAIL_PASS}`, 
+        pass: `${process.env.SEND_MAIL_PASS}`,
       },
     });
 
@@ -313,7 +328,9 @@ exports.forgotPassword = async (req, res, next) => {
       to: email, // list of receivers
       subject: 'Reset Password - BlogExpress', // Subject line
       text: `Blog Express`, // plain text body
-      html: `<h1>Link:</h1> http://localhost:8080/api/user/reset-password/${token}`, // html body
+      html: `<h1>Link to reset your password:</h1> 
+        <a href="http://localhost:3000/user/reset-password/${token}">Reset Now</a>
+      `, // html body
     });
 
     return res.status(200).json({ email, messageId: info.messageId });
@@ -329,7 +346,10 @@ exports.resetPassword = async (req, res, next) => {
   const { password, confirmPassword } = req.body;
   const { token } = req.params;
   try {
-    const decodedToken = jwt.verify(token, `${process.env.FORGOT_EMAIL_SECRET}`);
+    const decodedToken = jwt.verify(
+      token,
+      `${process.env.FORGOT_EMAIL_SECRET}`
+    );
     if (!decodedToken) {
       const error = new Error('Token is invalid or has expired!');
       error.status = 400;
@@ -372,7 +392,7 @@ exports.deleteUser = async (req, res, next) => {
 
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
-    error.code = 401;
+    error.statusCode = 401;
     throw error;
   }
 
@@ -387,7 +407,7 @@ exports.deleteUser = async (req, res, next) => {
       const user = await User.findById(id);
       if (user._id.toString() !== req.user.userId.toString()) {
         const error = new Error('Not authorized!');
-        error.code = 401;
+        error.statusCode = 401;
         throw error;
       }
 
@@ -397,6 +417,62 @@ exports.deleteUser = async (req, res, next) => {
       ]);
       return res.status(201).json({ id });
     }
+  } catch (err) {
+    if (!err.statusCode) {
+      err.statusCode = 500;
+    }
+    next(err);
+  }
+};
+
+exports.getNotifications = async (req, res, next) => {
+  if (!req.isAuth) {
+    const error = new Error('Not authenticated!');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  try {
+    const notifications = await Notification.find({
+      to: req.user.userId,
+    })
+      .sort({ createdAt: -1 })
+      .populate('post', '_id postStatus');
+
+    if (!notifications) {
+      const error = new Error('Notification not found!');
+      error.status = 404;
+      throw error;
+    }
+
+    return res.status(200).json(notifications);
+  } catch (err) {
+    if (!err.statusCode) {
+      err.statusCode = 500;
+    }
+    next(err);
+  }
+};
+
+exports.readNotifications = async (req, res, next) => {
+  if (!req.isAuth) {
+    const error = new Error('Not authenticated!');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  try {
+    await Notification.updateMany(
+      { isRead: false },
+      {
+        $set: {
+          isRead: true,
+        },
+      },
+      { multi: true, upsert: true }
+    );
+
+    return res.status(200).json('Updated');
   } catch (err) {
     if (!err.statusCode) {
       err.statusCode = 500;

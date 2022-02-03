@@ -6,7 +6,7 @@ const userController = require('../controllers/user');
 const isAuth = require('../middlewares/isAuth');
 
 // @route    POST api/user/create
-// @desc     Create user 
+// @desc     Create user
 // @access   Public
 router.post('/create', userController.createUser);
 
@@ -54,5 +54,15 @@ router.post('/reset-password/:token', userController.resetPassword);
 // @desc     Delete User
 // @access   Private
 router.delete('/:id', [isAuth], userController.deleteUser);
+
+// @route    GET api/user/notifications
+// @desc     Get Notifications
+// @access   Private
+router.get('/notifications', [isAuth], userController.getNotifications);
+
+// @route    PUT api/user/notifications
+// @desc     Update Read Notifications
+// @access   Private
+router.put('/notifications', [isAuth], userController.readNotifications);
 
 module.exports = router;

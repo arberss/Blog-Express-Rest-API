@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
-const bcrypt = require('bcryptjs');
 
 const userSchema = new Schema({
   email: {
@@ -29,7 +28,7 @@ const userSchema = new Schema({
       ref: 'Post',
     },
   ],
-  favorites: [Schema.Types.ObjectId],
+  favorites: [{ type: Schema.Types.ObjectId, ref: 'Post' }],
   passwordResetToken: String,
   passwordResetExpires: Date,
 });
