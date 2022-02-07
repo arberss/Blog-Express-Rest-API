@@ -71,6 +71,7 @@ exports.getAllPosts = async (req, res, next) => {
       const ObjectId = mongoose.Types.ObjectId;
       posts = await Post.find({
         categories: { $all: [ObjectId(category)] },
+        title: { $regex: search, $options: 'i' },
       })
         .skip((+page - 1) * size)
         .limit(+size)
@@ -83,7 +84,7 @@ exports.getAllPosts = async (req, res, next) => {
         categories: { $all: [ObjectId(category)] },
       }).countDocuments();
     } else {
-      posts = await Post.find()
+      posts = await Post.find({ title: { $regex: search, $options: 'i' } })
         .skip((+page - 1) * size)
         .limit(+size)
         .sort({ createdAt: -1 })
