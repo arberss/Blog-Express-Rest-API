@@ -212,7 +212,7 @@ exports.allUsers = async (req, res, next) => {
     throw error;
   }
   try {
-    const users = await User.find().select('-password');
+    const users = await User.find().select('-password -posts -favorites');
     if (!users) {
       const error = new Error('This user does not exist');
       error.status = 404;

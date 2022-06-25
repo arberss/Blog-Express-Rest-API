@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const process = require('process');
 const moment = require('moment');
+const helmet = require("helmet");
 
 const userRoutes = require('./routes/user');
 const postRoutes = require('./routes/post');
@@ -56,6 +57,8 @@ app.use((req, res, next) => {
 
 app.use('/api/user', userRoutes);
 app.use('/api/post', postRoutes);
+
+app.use(helmet());
 
 app.use((error, req, res, next) => {
   console.log(error);
