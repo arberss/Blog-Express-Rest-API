@@ -75,7 +75,7 @@ const dbConnection = async () => {
     });
 
     console.log('connected');
-    const server = app.listen(process.env.PORT);
+    const server = app.listen(process.env.PORT || 5000);
 
     const sck = require('./socket');
     const io = sck.init(server);
