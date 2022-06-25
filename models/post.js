@@ -1,6 +1,42 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+const categorySchema = new Schema({
+  category: {
+    type: String,
+    required: true,
+  },
+});
+
+const Category = mongoose.model('Category', categorySchema);
+
+const notificationSchema = new Schema(
+  {
+    message: {
+      type: String,
+      required: true,
+    },
+    sender: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    to: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    post: {
+      type: Schema.Types.ObjectId,
+      ref: 'Post',
+    },
+    isRead: {
+      type: Boolean,
+    },
+  },
+  { timestamps: true }
+);
+
+const Notification = mongoose.model('Notification', notificationSchema);
+
 const postSchema = new Schema(
   {
     title: {
@@ -9,6 +45,7 @@ const postSchema = new Schema(
     },
     imageUrl: {
       type: String,
+      required: true,
     },
     content: {
       type: String,
@@ -18,6 +55,12 @@ const postSchema = new Schema(
       type: String,
       required: true,
     },
+    categories: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Category',
+      },
+    ],
     comments: [
       {
         user: {
@@ -27,6 +70,10 @@ const postSchema = new Schema(
         text: {
           type: String,
           required: true,
+        },
+        edited: {
+          type: Boolean,
+          default: false,
         },
         date: {
           type: Date,
@@ -59,4 +106,10 @@ const postSchema = new Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Post', postSchema);
+const Post = mongoose.model('Post', postSchema);
+
+module.exports = {
+  Post,
+  Category,
+  Notification,
+};
