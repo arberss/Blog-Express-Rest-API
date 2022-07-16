@@ -11,6 +11,7 @@ const { Post, Notification } = require('../models/post');
 require('dotenv').config();
 
 const { imagekit } = require('../imagekit');
+const checkBase64 = require('../utils/functions');
 
 exports.createUser = async (req, res, next) => {
   const { email, name, password, confirmPassword, imageUrl } = req.body;
@@ -53,14 +54,17 @@ exports.createUser = async (req, res, next) => {
 
     let imgUrl = null;
     if (imageUrl) {
-      const mimetype = base64Mimetype(imageUrl);
-      try {
-        imgUrl = await imagekit.upload({
-          file: imageUrl,
-          fileName: `${uuidv4()}.${mimetype}`,
-        });
-      } catch (error) {
-        return error;
+      const isBase64 = checkBase64(imageUrl);
+      if (isBase64) {
+        const mimetype = base64Mimetype(imageUrl);
+        try {
+          imgUrl = await imagekit.upload({
+            file: imageUrl,
+            fileName: `${uuidv4()}.${mimetype}`,
+          });
+        } catch (error) {
+          return error;
+        }
       }
     }
 
@@ -184,14 +188,17 @@ exports.updateUser = async (req, res, next) => {
 
     let imgUrl = null;
     if (imageUrl) {
-      const mimetype = base64Mimetype(imageUrl);
-      try {
-        imgUrl = await imagekit.upload({
-          file: imageUrl,
-          fileName: `${uuidv4()}.${mimetype}`,
-        });
-      } catch (error) {
-        return error;
+      const isBase64 = checkBase64(imageUrl);
+      if (isBase64) {
+        const mimetype = base64Mimetype(imageUrl);
+        try {
+          imgUrl = await imagekit.upload({
+            file: imageUrl,
+            fileName: `${uuidv4()}.${mimetype}`,
+          });
+        } catch (error) {
+          return error;
+        }
       }
     }
 

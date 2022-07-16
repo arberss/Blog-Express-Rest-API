@@ -242,14 +242,17 @@ exports.createPost = async (req, res, next) => {
 
     let imgUrl = null;
     if (imageUrl) {
-      const mimetype = base64Mimetype(imageUrl);
-      try {
-        imgUrl = await imagekit.upload({
-          file: imageUrl,
-          fileName: `${uuidv4()}.${mimetype}`,
-        });
-      } catch (error) {
-        return error;
+      const isBase64 = checkBase64(imageUrl);
+      if (isBase64) {
+        const mimetype = base64Mimetype(imageUrl);
+        try {
+          imgUrl = await imagekit.upload({
+            file: imageUrl,
+            fileName: `${uuidv4()}.${mimetype}`,
+          });
+        } catch (error) {
+          return error;
+        }
       }
     }
 
@@ -319,22 +322,25 @@ exports.updatePost = async (req, res, next) => {
 
     let imgUrl = null;
     if (imageUrl) {
-      const mimetype = base64Mimetype(imageUrl);
-      try {
-        imgUrl = await imagekit.upload({
-          file: imageUrl,
-          fileName: `${uuidv4()}.${mimetype}`,
-        });
-
-        if (findPost.imageUrl) {
-          const getImgName = findPost.imageUrl.split('blogexpress/')[1];
-          const fileInfo = await imagekit.listFiles({
-            searchQuery: `name="${getImgName}"`,
+      const isBase64 = checkBase64(imageUrl);
+      if (isBase64) {
+        const mimetype = base64Mimetype(imageUrl);
+        try {
+          imgUrl = await imagekit.upload({
+            file: imageUrl,
+            fileName: `${uuidv4()}.${mimetype}`,
           });
-          await imagekit.deleteFile(fileInfo[0].fileId);
+
+          if (findPost.imageUrl) {
+            const getImgName = findPost.imageUrl.split('blogexpress/')[1];
+            const fileInfo = await imagekit.listFiles({
+              searchQuery: `name="${getImgName}"`,
+            });
+            await imagekit.deleteFile(fileInfo[0].fileId);
+          }
+        } catch (error) {
+          return error;
         }
-      } catch (error) {
-        return error;
       }
     }
 
