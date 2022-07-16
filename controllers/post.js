@@ -9,6 +9,7 @@ const { Category, Notification } = require('../models/post');
 const base64Mimetype = require('../utils/functions');
 const { imagekit } = require('../imagekit');
 const { v4: uuidv4 } = require('uuid');
+const checkBase64 = require('../utils/functions');
 
 exports.getPublicPosts = async (req, res, next) => {
   const { page, size, search } = req.query;
