@@ -6,7 +6,9 @@ const User = require('../models/user');
 const { Post } = require('../models/post');
 const { Category, Notification } = require('../models/post');
 
-const clearImage = require('../utils/clearImage');
+const base64Mimetype = require('../utils/functions');
+const { imagekit } = require('../imagekit');
+const { v4: uuidv4 } = require('uuid');
 
 exports.getPublicPosts = async (req, res, next) => {
   const { page, size, search } = req.query;
@@ -205,7 +207,7 @@ exports.getPost = async (req, res, next) => {
 };
 
 exports.createPost = async (req, res, next) => {
-  const { title, content, postStatus, categories } = req.body;
+  const { title, content, postStatus, categories, imageUrl } = req.body;
 
   if (!req.isAuth) {
     const error = new Error('Not authenticated!');
@@ -238,13 +240,20 @@ exports.createPost = async (req, res, next) => {
       throw error;
     }
 
-    let fileImageUrl = req.body.imageUrl;
-    if (req.file) {
-      fileImageUrl = req.file.path;
+    let imgUrl = null;
+    if (imageUrl) {
+      const mimetype = base64Mimetype(imageUrl);
+      try {
+        imgUrl = await imagekit.upload({
+          file: imageUrl,
+          fileName: `${uuidv4()}.${mimetype}`,
+        });
+      } catch (error) {
+        return error;
+      }
     }
 
-    let ctgList = categories.split(',');
-    ctgList = ctgList.map((ctg) => {
+    const ctgList = categories.map((ctg) => {
       return { _id: ctg };
     });
 
@@ -253,7 +262,7 @@ exports.createPost = async (req, res, next) => {
       content,
       postStatus,
       categories: ctgList,
-      imageUrl: req.file ? fileImageUrl : null,
+      imageUrl: imgUrl ? imgUrl.url : null,
       creator: user,
     });
     const createdPost = await post.save();
@@ -269,7 +278,7 @@ exports.createPost = async (req, res, next) => {
 };
 
 exports.updatePost = async (req, res, next) => {
-  const { title, content, postStatus, categories } = req.body;
+  const { title, content, postStatus, categories, imageUrl } = req.body;
   const { id } = req.params;
 
   if (!req.isAuth) {
@@ -308,30 +317,37 @@ exports.updatePost = async (req, res, next) => {
       throw error;
     }
 
-    let imageUrl = req.body.imageUrl;
-    if (req.file) {
-      imageUrl = req.file.path;
+    let imgUrl = null;
+    if (imageUrl) {
+      const mimetype = base64Mimetype(imageUrl);
+      try {
+        imgUrl = await imagekit.upload({
+          file: imageUrl,
+          fileName: `${uuidv4()}.${mimetype}`,
+        });
+
+        if (findPost.imageUrl) {
+          const getImgName = findPost.imageUrl.split('blogexpress/')[1];
+          const fileInfo = await imagekit.listFiles({
+            searchQuery: `name="${getImgName}"`,
+          });
+          await imagekit.deleteFile(fileInfo[0].fileId);
+        }
+      } catch (error) {
+        return error;
+      }
     }
 
-    if (imageUrl !== findPost.imageUrl && findPost.imageUrl) {
-      clearImage(findPost.imageUrl);
-    }
-
-    let ctgList = categories.split(',');
-    ctgList = ctgList.map((ctg) => {
+    const ctgList = categories.map((ctg) => {
       return { _id: ctg };
     });
 
     findPost.title = title;
     findPost.content = content;
     findPost.postStatus = postStatus;
-    findPost.imageUrl = imageUrl;
+    findPost.imageUrl = imgUrl ? imgUrl.url : findPost.imageUrl;
     findPost.creator = req.user.userId;
     findPost.categories = ctgList;
-
-    if (!imageUrl || !req.file) {
-      delete findPost.imageUrl;
-    }
 
     const updatedPost = await findPost.save();
 
@@ -360,7 +376,11 @@ exports.deletePost = async (req, res, next) => {
     const post = await Post.findById(id).populate('creator', '_id');
     if (req.user.role.toLowerCase() === 'admin') {
       if (post.imageUrl) {
-        clearImage(post.imageUrl);
+        const getImgName = post.imageUrl.split('blogexpress/')[1];
+        const fileInfo = await imagekit.listFiles({
+          searchQuery: `name="${getImgName}"`,
+        });
+        await imagekit.deleteFile(fileInfo[0].fileId);
       }
 
       const user = await User.findById(post.creator._id).populate('posts');
@@ -377,7 +397,11 @@ exports.deletePost = async (req, res, next) => {
       }
 
       if (post.imageUrl) {
-        clearImage(post.imageUrl);
+        const getImgName = post.imageUrl.split('blogexpress/')[1];
+        const fileInfo = await imagekit.listFiles({
+          searchQuery: `name="${getImgName}"`,
+        });
+        await imagekit.deleteFile(fileInfo[0].fileId);
       }
 
       user.posts.pull(id);

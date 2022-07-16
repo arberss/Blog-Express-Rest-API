@@ -2,16 +2,18 @@ const bcrypt = require('bcryptjs');
 const validator = require('validator');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const { v4: uuidv4 } = require('uuid');
+const base64Mimetype = require('../utils/functions');
 
 const User = require('../models/user');
 const { Post, Notification } = require('../models/post');
 
 require('dotenv').config();
 
-const clearImage = require('../utils/clearImage');
+const { imagekit } = require('../imagekit');
 
 exports.createUser = async (req, res, next) => {
-  const { email, name, password, confirmPassword } = req.body;
+  const { email, name, password, confirmPassword, imageUrl } = req.body;
 
   const errors = [];
   if (!validator.isEmail(email)) {
@@ -49,10 +51,23 @@ exports.createUser = async (req, res, next) => {
 
     const hashedPw = await bcrypt.hash(password, 12);
 
+    let imgUrl = null;
+    if (imageUrl) {
+      const mimetype = base64Mimetype(imageUrl);
+      try {
+        imgUrl = await imagekit.upload({
+          file: imageUrl,
+          fileName: `${uuidv4()}.${mimetype}`,
+        });
+      } catch (error) {
+        return error;
+      }
+    }
+
     const user = new User({
       email,
       name,
-      imageUrl: req.file ? req.file.path : null,
+      imageUrl: imgUrl ? imgUrl.url : null,
       password: hashedPw,
     });
 
@@ -139,7 +154,7 @@ exports.updateUser = async (req, res, next) => {
     throw error;
   }
 
-  const { email, name, password, confirmPassword } = req.body;
+  const { email, name, password, confirmPassword, imageUrl } = req.body;
 
   const errors = [];
   if (!validator.isEmail(email)) {
@@ -167,24 +182,23 @@ exports.updateUser = async (req, res, next) => {
     const user = await User.findById(req.user.userId).populate('posts');
     const hashedPw = await bcrypt.hash(password, 12);
 
-    let imageUrl = req.body.imageUrl;
-    if (req.file) {
-      imageUrl = req.file.path;
-    }
-
-    if (imageUrl !== user.imageUrl && user.imageUrl) {
-      clearImage(user.imageUrl);
+    let imgUrl = null;
+    if (imageUrl) {
+      const mimetype = base64Mimetype(imageUrl);
+      try {
+        imgUrl = await imagekit.upload({
+          file: imageUrl,
+          fileName: `${uuidv4()}.${mimetype}`,
+        });
+      } catch (error) {
+        return error;
+      }
     }
 
     user.email = email || user.email;
     user.name = name || user.name;
-    user.imageUrl =
-      imageUrl !== null || imageUrl.trim() !== '' ? imageUrl : user?.imageUrl;
+    user.imageUrl = imgUrl !== null ? imgUrl.url : user?.imageUrl;
     user.password = password.trim() !== '' ? hashedPw : user.password;
-
-    if (!imageUrl || !req.file) {
-      delete user.imageUrl;
-    }
 
     const savedUser = await user.save();
 
