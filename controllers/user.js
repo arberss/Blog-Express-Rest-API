@@ -99,7 +99,7 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email });
     if (!user) {
       const error = new Error('This user does not exist');
-      error.status = 404;
+      error.statusCode = 404;
       throw error;
     }
     const isEqual = await bcrypt.compare(password, user.password);
